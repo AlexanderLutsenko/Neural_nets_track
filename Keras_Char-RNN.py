@@ -17,10 +17,10 @@ import numpy as np
 import random
 import sys
 
-path = get_file('nietzsche.txt', origin="https://s3.amazonaws.com/text-datasets/nietzsche.txt")
-# path = 'miron'
+# path = get_file('nietzsche.txt', origin="https://s3.amazonaws.com/text-datasets/nietzsche.txt")
+path = 'miron'
 text = open(path).read().lower()
-# text = ''.join(ch for ch in text if ch in 'йцукенгшщзхъфывапролджэячсмитьбюё- \n')
+text = ''.join(ch for ch in text if ch in 'йцукенгшщзхъфывапролджэячсмитьбюё- \n')
 
 print('corpus length:', len(text))
 
