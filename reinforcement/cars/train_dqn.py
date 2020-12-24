@@ -46,8 +46,8 @@ def get_args():
                         )
     # Agent won't start training until memory is big enough
     parser.add_argument('--replay_memory_warmup_size', type=int,
-                        default=10000
-                        # default=0
+                        # default=10000
+                        default=0
                         )
 
     parser.add_argument('--batch_size', type=int,
