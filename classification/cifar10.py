@@ -4,10 +4,9 @@ import torch.nn as nn
 import torchvision
 import torchvision.transforms as transforms
 
-
-# Device configuration
 from classification.util import visualize_model
 
+# Device configuration
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 # Hyper parameters
