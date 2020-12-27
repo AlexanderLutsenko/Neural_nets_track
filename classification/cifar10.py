@@ -52,29 +52,30 @@ class Flatten(nn.Module):
 
 
 model = nn.Sequential(
-    # (32, 32, 3)
+    # (b, c, h, w)
+    # (b, 3, 32, 32)
     nn.Conv2d(3, 32, kernel_size=3, stride=1, padding=1),
     nn.BatchNorm2d(32),
     nn.ReLU(),
     nn.MaxPool2d(kernel_size=2, stride=2),
-    # (16, 16, 32)
+    # (b, 32. 16, 16)
     nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
     nn.BatchNorm2d(64),
     nn.ReLU(),
     nn.MaxPool2d(kernel_size=2, stride=2),
-    # (8, 8, 64)
+    # (b, 64, 8, 8)
     nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),
     nn.BatchNorm2d(128),
     nn.ReLU(),
     nn.MaxPool2d(kernel_size=2, stride=2),
-    # (4, 4, 128)
+    # (b, 128, 4, 4)
     nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1),
     nn.BatchNorm2d(256),
     nn.ReLU(),
     nn.MaxPool2d(kernel_size=2, stride=2),
-    # (2, 2, 256)
+    # (b, 256, 2, 2)
     Flatten(),
-    # (2*2*256)
+    # (b, 256*2*2)
     nn.Dropout(p=0.5),
     nn.Linear(2 * 2 * 256, num_classes)
 ).to(device)
@@ -84,6 +85,7 @@ print(model)
 # Loss and optimizer
 loss_function = nn.CrossEntropyLoss()
 optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum)
+# optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
 
 # Train the model
@@ -103,13 +105,11 @@ for epoch in range(num_epochs):
         # Before the backward pass, use the optimizer object to zero all of the
         # gradients for the variables it will update (which are the learnable
         # weights of the model). This is because by default, gradients are
-        # accumulated in buffers( i.e, not overwritten) whenever .backward()
+        # accumulated in buffers(i.e, not overwritten) whenever .backward()
         # is called. Checkout docs of torch.autograd.backward for more details.
         optimizer.zero_grad()
-
         # Backward pass: compute gradient of the loss with respect to model parameters
         loss.backward()
-
         # Calling the step function on an Optimizer makes an update to its parameters
         optimizer.step()
 
@@ -121,7 +121,7 @@ for epoch in range(num_epochs):
 
 
 # Test the model
-model.eval()  # eval mode (batchnorm uses moving mean/variance instead of mini-batch mean/variance)
+model.eval()  # eval mode (batchnorm uses moving mean/variance instead of mini-batch mean/variance; dropout disabled)
 with torch.no_grad():
     correct = 0
     total = 0

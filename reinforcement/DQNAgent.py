@@ -150,7 +150,7 @@ class DQNAgent(object):
             state_q_values = self.policy_net(state_batch)
             state_action_values = state_q_values.gather(1, action_batch.unsqueeze(1)).squeeze(1)
 
-            # Compute max Q(s_{t+1}) for all next states.
+            # Compute max Q(s_{t+1})
             # target_net must never be trained, so disable gradient calculation for it
             with torch.no_grad():
                 next_state_values = self.target_net(next_state_batch).max(1)[0]

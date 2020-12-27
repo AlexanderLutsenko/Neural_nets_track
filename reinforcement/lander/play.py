@@ -16,7 +16,7 @@ while True:
     while True:
         frame = env.render(mode='rgb_array')
 
-        cv2.imshow(env_name, cv2.cvtColor(frame,  cv2.COLOR_BGR2RGB))
+        cv2.imshow(env_name, cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
         key = cv2.waitKey(delay)
 
         # If ESC pressed, reset the environment

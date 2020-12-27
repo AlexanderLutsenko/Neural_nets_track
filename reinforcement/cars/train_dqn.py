@@ -215,7 +215,7 @@ class StateKeeper:
         self.num_channels = 1 * self.sequence_length
 
     def append_state(self, state, reset=False):
-        # PyTorch image layout is different from that of the environment
+        # PyTorch image channel order is different from that of the environment
         # (h, w, c) -> (c, h, w)
         state = state.copy().transpose((2, 0, 1))
         # Take green channel
