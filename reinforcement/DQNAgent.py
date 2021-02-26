@@ -65,15 +65,15 @@ class DQNAgent(object):
         self.target_update_frequency = target_update_frequency
         self.repeat_update = repeat_update
 
-        self.policy_net = network_builder().to(device)
+        self.Q_net = network_builder().to(device)
 
-        self.target_net = network_builder().to(device)
-        self.target_net.load_state_dict(self.policy_net.state_dict())
+        self.Q_net_target = network_builder().to(device)
+        self.Q_net_target.load_state_dict(self.Q_net.state_dict())
         # Some layers (like Dropout, Batch normalization, etc.) exhibit different behaviour depending on the mode (training or evaluation)
         # target_net (used in loss calculation) is a frozen copy of policy_net and never trains, so set it in evaluation mode right away
-        self.target_net.eval()
+        self.Q_net_target.eval()
 
-        self.optimizer = optimizer_builder(self.policy_net.parameters())
+        self.optimizer = optimizer_builder(self.Q_net.parameters())
 
         # Here we'll be maintaining our "dataset", i.e. agent's past experience
         self.memory = ReplayMemory(replay_memory_size)
@@ -88,14 +88,16 @@ class DQNAgent(object):
         self.is_training = is_training
 
     def save_weights(self, path):
-        torch.save(self.policy_net.state_dict(), path)
+        torch.save(self.Q_net.state_dict(), path)
 
     def load_weights(self, path):
         state_dict = torch.load(path)
-        self.policy_net.load_state_dict(state_dict)
-        self.target_net.load_state_dict(state_dict)
+        self.Q_net.load_state_dict(state_dict)
+        self.Q_net_target.load_state_dict(state_dict)
 
     def act(self, state):
+        self.Q_net.eval()
+
         sample = random.random()
         self.eps_threshold = self.eps_start - (self.eps_start - self.eps_end) * min(1, self.steps_done / self.eps_decay)
 
@@ -105,12 +107,11 @@ class DQNAgent(object):
         # make "best" action with probability (1 - eps_threshold)
         if not self.is_training or sample > self.eps_threshold:
             with torch.no_grad():
-                th_state = torch.from_numpy(state).unsqueeze(0).type(torch.get_default_dtype()).to(self.device)
-                self.policy_net.train(False)
-                action_scores = self.policy_net(th_state)
-                self.policy_net.train(True)
+                state = torch.from_numpy(state).unsqueeze(0).type(torch.get_default_dtype()).to(self.device)
+                action_scores = self.Q_net(state)
+                # take the index of the single highest-valued action
                 action = action_scores.max(1)[1]
-                return np.asscalar(action.cpu().numpy()[0])
+                return np.asscalar(action.cpu().numpy())
         # otherwise, act randomly
         else:
             return random.randrange(self.num_actions)
@@ -130,6 +131,7 @@ class DQNAgent(object):
         self.learn()
 
     def learn(self):
+        self.Q_net.train()
 
         if len(self.memory) < max(self.batch_size, self.replay_memory_warmup_size):
             return
@@ -146,18 +148,21 @@ class DQNAgent(object):
             next_state_batch = torch.stack(batch.next_state).type(torch.get_default_dtype()).to(self.device)
             non_terminal_mask = torch.stack(batch.non_terminal).to(self.device)
 
-            # Compute Q(s_t, a) - the model computes Q(s_t), then we select the columns of actions taken
-            state_q_values = self.policy_net(state_batch)
-            state_action_values = state_q_values.gather(1, action_batch.unsqueeze(1)).squeeze(1)
+            # Compute Q(s_t, a)
+            all_Q_values = self.Q_net(state_batch)
+            # ...then we the columns of actions taken
+            # Be careful! Something like all_Q_values[:, action_batch] won't work as expected
+            Q_values = all_Q_values.gather(1, action_batch.unsqueeze(1)).squeeze(1)
 
-            # Compute max Q(s_{t+1})
-            # target_net must never be trained, so disable gradient calculation for it
+            # Q_net_target must never be trained, so disable gradient calculation for it
             with torch.no_grad():
-                next_state_values = self.target_net(next_state_batch).max(1)[0]
+                # Compute max Q'(s_{t+1})
+                # torch.max returns tuple (max_values, max_indices), we only need the values
+                next_Q_values = self.Q_net_target(next_state_batch).max(1)[0]
+                # Compute the expected Q values
+                expected_Q_values = (next_Q_values * non_terminal_mask * self.gamma) + reward_batch
 
-            # Compute the expected Q values
-            expected_state_action_values = (next_state_values * non_terminal_mask * self.gamma) + reward_batch
-            loss = F.mse_loss(state_action_values, expected_state_action_values)
+            loss = F.mse_loss(Q_values, expected_Q_values)
 
             # Optimize the model
             self.optimizer.zero_grad()
@@ -165,5 +170,5 @@ class DQNAgent(object):
             self.optimizer.step()
 
         if self.steps_done % self.target_update_frequency == 0:
-            # It's time to update target_net
-            self.target_net.load_state_dict(self.policy_net.state_dict())
+            # It's time to update target net
+            self.Q_net_target.load_state_dict(self.Q_net.state_dict())
