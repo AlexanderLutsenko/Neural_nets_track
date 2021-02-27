@@ -70,17 +70,19 @@ def get_args():
     # chance to perform random action decreases from eps_start to eps_end over the course of eps_decay steps
     parser.add_argument('--eps_start', type=float,
                         default=1
+                        # default=0.9
                         )
     parser.add_argument('--eps_end', type=float,
-                        default=0.3
+                        # default=0.3
+                        default=0.05
                         )
     parser.add_argument('--eps_decay', type=int,
-                        default=50000
+                        default=50*200
                         )
 
     # target_net update frequency
     parser.add_argument('--target_update_frequency', type=int,
-                        default=100
+                        default=200
                         )
     # Number of training steps per observation step
     parser.add_argument('--repeat_update', type=int,
@@ -90,6 +92,7 @@ def get_args():
     # random seed
     parser.add_argument('--seed', type=int,
                         default=42
+                        # default=100500
                         )
 
     args = parser.parse_args()
@@ -102,11 +105,7 @@ class Actor(nn.Module):
         num_hidden = 64
         self.net = nn.Sequential(
             nn.Linear(state_size, num_hidden),
-            nn.BatchNorm1d(num_hidden),
-            nn.ELU(),
-            nn.Linear(num_hidden, num_hidden),
-            nn.BatchNorm1d(num_hidden),
-            nn.ELU(),
+            nn.Sigmoid(),
             nn.Linear(num_hidden, num_actions),
             nn.Sigmoid()
         )
@@ -124,11 +123,7 @@ class Critic(nn.Module):
         num_hidden = 64
         self.net = nn.Sequential(
             nn.Linear(state_size + num_actions, num_hidden),
-            nn.BatchNorm1d(num_hidden),
-            nn.ELU(),
-            nn.Linear(num_hidden, num_hidden),
-            nn.BatchNorm1d(num_hidden),
-            nn.ELU(),
+            nn.Sigmoid(),
             nn.Linear(num_hidden, 1)
         )
 
@@ -203,9 +198,9 @@ if __name__ == '__main__':
                 environment.render()
 
             actions = agent.act(last_state)
-            actions = np.clip(actions, -2, 2)
 
             next_state, reward, is_terminal, info = environment.step(actions)
+            reward = reward / 1000
 
             agent.observe_and_learn(last_state, actions, reward, next_state, is_terminal)
 
