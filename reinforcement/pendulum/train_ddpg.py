@@ -52,7 +52,7 @@ def get_args():
                         default=256
                         )
     parser.add_argument('--actor_learning_rate', type=float,
-                        default=0.0001
+                        default=0.001
                         )
     parser.add_argument('--critic_learning_rate', type=float,
                         default=0.001
