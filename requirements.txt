@@ -1,4 +1,4 @@
 torch
 box2d-py
-gym
+gym[box2d]
 matplotlib

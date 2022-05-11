@@ -9,23 +9,23 @@ import torch.optim as optim
 
 import random
 
-from reinforcement.DQNAgent import DQNAgent
+from reinforcement.agent.DQNAgent import DQNAgent
 
 
 def get_args():
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--train', type=lambda x: bool(int(x)),
-                        default=True,
-                        # default=False
+                        # default=True,
+                        default=False
                         )
     parser.add_argument('--visualize', type=lambda x: bool(int(x)),
                         default=True
                         # default=False
                         )
     parser.add_argument('--load_from_checkpoint', type=lambda x: bool(int(x)),
-                        # default=True
-                        default=False
+                        default=True
+                        # default=False
                         )
     parser.add_argument('--checkpoint_dir', type=str,
                         default='./checkpoints'
@@ -215,7 +215,7 @@ class StateKeeper:
         self.num_channels = 1 * self.sequence_length
 
     def append_state(self, state, reset=False):
-        # PyTorch image channel order is different from that of the environment
+        # PyTorch image channel order is different from that of the experiments
         # (h, w, c) -> (c, h, w)
         state = state.copy().transpose((2, 0, 1))
         # Take green channel
@@ -252,7 +252,7 @@ if __name__ == '__main__':
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     torch.set_default_tensor_type('torch.FloatTensor')
 
-    env_name = 'CarRacing-v0'
+    env_name = 'CarRacing-v1'
     environment = gym.make(env_name)
 
     # Set fixed random seeds so your experiments are reproducible
@@ -268,7 +268,7 @@ if __name__ == '__main__':
     # Since DQN can only make discrete actions,
     # so there are 5 of them which we then transform into 3 original continuous actions
     action_mapper = DiscreteToContinuousActionMapper()
-    # We want to modify original environment's reward when car goes off the track
+    # We want to modify original experiments's reward when car goes off the track
     off_road_analyzer = OffRoadAnalyzer()
 
     agent = create_agent(args, state_keeper.num_channels, action_mapper.num_discrete_actions)
@@ -282,7 +282,7 @@ if __name__ == '__main__':
     for episode in range(args.num_episodes):
 
         # FIXME: CarRacing-v0 leaks memory,
-        #  so instead of simply calling environment.reset(), we create new environment at the start of each episode
+        #  so instead of simply calling experiments.reset(), we create new experiments at the start of each episode
         environment.close()
         environment = gym.make(env_name)
         environment.seed(args.seed + episode)

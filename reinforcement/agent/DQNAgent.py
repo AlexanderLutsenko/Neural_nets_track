@@ -96,24 +96,24 @@ class DQNAgent(object):
         self.target_net.load_state_dict(state_dict)
 
     def act(self, state):
+        self.policy_net.eval()
+
         sample = random.random()
         self.eps_threshold = self.eps_start - (self.eps_start - self.eps_end) * min(1, self.steps_done / self.eps_decay)
 
         self.steps_done += 1
 
         # epsilon-greedy policy:
-        # make "best" action with probability (1 - eps_threshold)
-        if not self.is_training or sample > self.eps_threshold:
+        # with probability eps_threshold, act randomly
+        if self.is_training and sample < self.eps_threshold:
+            return random.randrange(self.num_actions)
+        # otherwise, make the "best" action
+        else:
             with torch.no_grad():
                 th_state = torch.from_numpy(state).unsqueeze(0).type(torch.get_default_dtype()).to(self.device)
-                self.policy_net.train(False)
                 action_scores = self.policy_net(th_state)
-                self.policy_net.train(True)
                 action = action_scores.max(1)[1]
-                return np.asscalar(action.cpu().numpy()[0])
-        # otherwise, act randomly
-        else:
-            return random.randrange(self.num_actions)
+                return np.asscalar(action.cpu().numpy())
 
     def observe_and_learn(self, state, action, reward, next_state, is_terminal):
         if not self.is_training:
@@ -130,6 +130,7 @@ class DQNAgent(object):
         self.learn()
 
     def learn(self):
+        self.policy_net.train()
 
         if len(self.memory) < max(self.batch_size, self.replay_memory_warmup_size):
             return
@@ -156,7 +157,7 @@ class DQNAgent(object):
                 next_state_values = self.target_net(next_state_batch).max(1)[0]
 
             # Compute the expected Q values
-            expected_state_action_values = (next_state_values * non_terminal_mask * self.gamma) + reward_batch
+            expected_state_action_values = reward_batch + (self.gamma * next_state_values * non_terminal_mask)
             loss = F.mse_loss(state_action_values, expected_state_action_values)
 
             # Optimize the model

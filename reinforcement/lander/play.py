@@ -12,14 +12,13 @@ delay = 50
 while True:
     observation = env.reset()
     total_reward = 0
-    prev_action = 0
     while True:
         frame = env.render(mode='rgb_array')
 
         cv2.imshow(env_name, cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
         key = cv2.waitKey(delay)
 
-        # If ESC pressed, reset the environment
+        # If ESC pressed, reset the experiments
         if key == 27:
             break
 
@@ -34,8 +33,6 @@ while True:
 
         observation, reward, done, info = env.step(action)
         total_reward += reward
-
-        prev_action = action
 
         if done:
             print(total_reward)

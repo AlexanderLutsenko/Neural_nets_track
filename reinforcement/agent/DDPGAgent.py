@@ -121,18 +121,18 @@ class DDPGAgent(object):
             th_state = torch.from_numpy(state).unsqueeze(0).type(torch.get_default_dtype()).to(self.device)
             action = self.actor_net(th_state).detach().cpu().numpy().squeeze(axis=0)
 
-            sample = random.random()
-            self.eps_threshold = self.eps_start - (self.eps_start - self.eps_end) * min(1, self.steps_done / self.eps_decay)
-            if self.is_training and sample < self.eps_threshold:
-                action = np.random.uniform(-2, 2, size=action.shape)
+            # sample = random.random()
+            # self.eps_threshold = self.eps_start - (self.eps_start - self.eps_end) * min(1, self.steps_done / self.eps_decay)
+            # if self.is_training and sample < self.eps_threshold:
+            #     action = np.random.uniform(-2, 2, size=action.shape)
 
             # if self.is_training and self.steps_done < self.eps_decay:
             #     p = self.steps_done / self.eps_decay
             #     action = action * p + (1 - p) * next(self.noise) * 2
 
-            # if self.is_training and self.steps_done < self.eps_decay:
-            #     p = self.steps_done / self.eps_decay
-            #     action = np.random.normal(loc=action, scale=p, size=action.shape)
+            if self.is_training and self.steps_done < self.eps_decay:
+                p = self.steps_done / self.eps_decay
+                action = np.random.normal(loc=action, scale=p, size=action.shape)
 
             return action
 
@@ -171,18 +171,13 @@ class DDPGAgent(object):
 
             # Compute Q(s_t, mu(s_t))
             Q_values = self.critic_net(state_batch, action_batch).squeeze(dim=1)
-            # print(action_batch)
-            # print(state_batch)
 
             # Compute Q'(s_{t+1}, mu'(s_{t+1}))
             with torch.no_grad():
                 next_Q_values = self.critic_target_net(next_state_batch, self.actor_target_net(next_state_batch)).squeeze(dim=1)
                 expected_Q_values = (next_Q_values * non_terminal_mask * self.gamma) + reward_batch
 
-            # print(Q_values.shape, expected_Q_values.shape)
-
             critic_loss = F.mse_loss(Q_values, expected_Q_values)
-            # print(critic_loss.detach().cpu().numpy() / reward_batch.mean().cpu().numpy())
 
             # Optimize the critic
             self.critic_optimizer.zero_grad()
@@ -196,9 +191,9 @@ class DDPGAgent(object):
             actor_loss.backward()
             self.actor_optimizer.step()
 
-        # self.update_target_net(self.actor_target_net, self.actor_net, self.update_tau)
-        # self.update_target_net(self.critic_target_net, self.critic_net, self.update_tau)
+        self.update_target_net(self.actor_target_net, self.actor_net, self.update_tau)
+        self.update_target_net(self.critic_target_net, self.critic_net, self.update_tau)
 
-        if self.steps_done % self.target_update_frequency == 0:
-            self.actor_target_net.load_state_dict(self.actor_net.state_dict())
-            self.critic_target_net.load_state_dict(self.critic_net.state_dict())
+        # if self.steps_done % self.target_update_frequency == 0:
+        #     self.actor_target_net.load_state_dict(self.actor_net.state_dict())
+        #     self.critic_target_net.load_state_dict(self.critic_net.state_dict())

@@ -5,26 +5,25 @@ import gym
 import torch
 import torch.nn as nn
 import torch.optim as optim
-
 import random
 
-from reinforcement.DQNAgent import DQNAgent
+from reinforcement.agent.DDPGAgent import DDPGAgent
 
 
 def get_args():
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--train', type=lambda x: bool(int(x)),
-                        default=True,
-                        # default=False
+                        # default=True,
+                        default=False
                         )
     parser.add_argument('--visualize', type=lambda x: bool(int(x)),
                         default=True
                         # default=False
                         )
     parser.add_argument('--load_from_checkpoint', type=lambda x: bool(int(x)),
-                        # default=True
-                        default=False
+                        default=True
+                        # default=False
                         )
     parser.add_argument('--checkpoint_dir', type=str,
                         default='./checkpoints'
@@ -45,17 +44,17 @@ def get_args():
                         )
     # Agent won't start training until memory is big enough
     parser.add_argument('--replay_memory_warmup_size', type=int,
-                        default=1
+                        default=256*3
                         )
 
     parser.add_argument('--batch_size', type=int,
-                        default=512
+                        default=256
                         )
-    parser.add_argument('--learning_rate', type=float,
-                        default=0.001
+    parser.add_argument('--actor_learning_rate', type=float,
+                        default=1e-3
                         )
-    parser.add_argument('--momentum', type=float,
-                        default=0.95
+    parser.add_argument('--critic_learning_rate', type=float,
+                        default=1e-3
                         )
 
     # Total reward discount
@@ -66,18 +65,20 @@ def get_args():
     # epsilon-greedy parameters:
     # chance to perform random action decreases from eps_start to eps_end over the course of eps_decay steps
     parser.add_argument('--eps_start', type=float,
-                        default=0.9
+                        default=1
+                        # default=0.9
                         )
     parser.add_argument('--eps_end', type=float,
+                        # default=0.3
                         default=0.05
                         )
     parser.add_argument('--eps_decay', type=int,
-                        default=10000
+                        default=50*200
                         )
 
     # target_net update frequency
     parser.add_argument('--target_update_frequency', type=int,
-                        default=100
+                        default=200
                         )
     # Number of training steps per observation step
     parser.add_argument('--repeat_update', type=int,
@@ -93,21 +94,50 @@ def get_args():
     return args
 
 
-def create_agent(args, state_size, num_actions):
-
-    def network_builder():
-
-        net = nn.Sequential(
-            nn.Linear(state_size, 128),
+class Actor(nn.Module):
+    def __init__(self, state_size, num_actions):
+        super().__init__()
+        num_hidden = 64
+        self.net = nn.Sequential(
+            nn.Linear(state_size, num_hidden),
             nn.Sigmoid(),
-            nn.Linear(128, num_actions)
+            nn.Linear(num_hidden, num_actions),
+            nn.Sigmoid()
+        )
+        self.min_val = float(environment.action_space.low)
+        self.max_val = float(environment.action_space.high)
+
+    def forward(self, states):
+        actions_unscaled = self.net(states)
+        return self.min_val + actions_unscaled * (self.max_val - self.min_val)
+
+
+class Critic(nn.Module):
+    def __init__(self, state_size, num_actions):
+        super().__init__()
+        num_hidden = 64
+        self.net = nn.Sequential(
+            nn.Linear(state_size + num_actions, num_hidden),
+            nn.Sigmoid(),
+            nn.Linear(num_hidden, 1)
         )
 
-        return net
+    def forward(self, states, actions):
+        return self.net(torch.cat([states, actions], dim=1))
 
-    optimizer_builder = lambda parameters: optim.SGD(parameters, lr=args.learning_rate, momentum=args.momentum)
 
-    agent = DQNAgent(network_builder, optimizer_builder,
+def create_agent(args, state_size, num_actions):
+
+    def actor_builder():
+        return Actor(state_size, num_actions)
+
+    def critic_builder():
+        return Critic(state_size, num_actions)
+
+    actor_optimizer_builder = lambda parameters: optim.Adam(parameters, lr=args.actor_learning_rate)
+    critic_optimizer_builder = lambda parameters: optim.Adam(parameters, lr=args.critic_learning_rate)
+
+    agent = DDPGAgent(actor_builder, critic_builder, actor_optimizer_builder, critic_optimizer_builder,
                      device, num_actions,
                      gamma=args.gamma,
 
@@ -133,7 +163,7 @@ if __name__ == '__main__':
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     torch.set_default_tensor_type('torch.FloatTensor')
 
-    env_name = 'LunarLander-v2'
+    env_name = 'Pendulum-v1'
     environment = gym.make(env_name)
 
     # Set fixed random seeds so your experiments are reproducible
@@ -145,7 +175,7 @@ if __name__ == '__main__':
     print('Action space: {}'.format(environment.action_space))
 
     state_size = environment.observation_space.shape[0]
-    num_actions = environment.action_space.n
+    num_actions = environment.action_space.shape[0]
     agent = create_agent(args, state_size, num_actions)
 
     if args.load_from_checkpoint:
@@ -161,9 +191,12 @@ if __name__ == '__main__':
             if args.visualize:
                 environment.render()
 
-            action = agent.act(last_state)
-            next_state, reward, is_terminal, info = environment.step(action)
-            agent.observe_and_learn(last_state, action, reward, next_state, is_terminal)
+            actions = agent.act(last_state)
+
+            next_state, reward, is_terminal, info = environment.step(actions)
+            reward = reward / 1000
+
+            agent.observe_and_learn(last_state, actions, reward, next_state, is_terminal)
 
             total_steps += 1
             total_reward += reward
