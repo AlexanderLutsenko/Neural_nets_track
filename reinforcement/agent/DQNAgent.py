@@ -107,7 +107,7 @@ class DQNAgent(object):
         # with probability eps_threshold, act randomly
         if self.is_training and sample < self.eps_threshold:
             return random.randrange(self.num_actions)
-        # otherwise, make the "best" action
+        # otherwise, take the "best" action
         else:
             with torch.no_grad():
                 th_state = torch.from_numpy(state).unsqueeze(0).type(torch.get_default_dtype()).to(self.device)

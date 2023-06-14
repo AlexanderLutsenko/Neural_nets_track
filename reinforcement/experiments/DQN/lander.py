@@ -96,13 +96,11 @@ def get_args():
 def create_agent(args, state_size, num_actions):
 
     def network_builder():
-
         net = nn.Sequential(
             nn.Linear(state_size, 128),
             nn.Sigmoid(),
             nn.Linear(128, num_actions)
         )
-
         return net
 
     optimizer_builder = lambda parameters: optim.SGD(parameters, lr=args.learning_rate, momentum=args.momentum)
